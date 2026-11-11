@@ -2,49 +2,52 @@ from types import SimpleNamespace
 
 import pytest
 
-from whatsapp_transcriber.transcription import OpenAITranscriber, TranscriptionError
+from whatsapp_transcriber.transcription import FasterWhisperTranscriber, TranscriptionError
 
 
-class FakeAudioTranscriptions:
-    def __init__(self, result=None, error=None):
-        self.result = result
+class FakeWhisperModel:
+    def __init__(self, segments=None, error=None):
+        self.segments = segments or []
         self.error = error
-        self.kwargs = None
+        self.audio_bytes = None
+        self.options = None
 
-    def create(self, **kwargs):
-        self.kwargs = kwargs
+    def transcribe(self, audio, **options):
+        self.audio_bytes = audio.read()
+        self.options = options
         if self.error:
             raise self.error
-        return self.result
+        return iter(self.segments), SimpleNamespace(language="pt")
 
 
-def test_transcriber_returns_trimmed_portuguese_text() -> None:
-    audio = FakeAudioTranscriptions(SimpleNamespace(text="  olá, tudo bem?  "))
-    transcriber = OpenAITranscriber(client=SimpleNamespace(audio=SimpleNamespace(transcriptions=audio)))
+def test_transcriber_returns_trimmed_portuguese_text_from_local_model() -> None:
+    model = FakeWhisperModel([SimpleNamespace(text=" olá"), SimpleNamespace(text=", tudo bem? ")])
+    transcriber = FasterWhisperTranscriber(model=model)
 
-    assert transcriber.transcribe(b"audio", "voice.ogg", "audio/ogg") == "olá, tudo bem?"
-    assert audio.kwargs["language"] == "pt"
-    assert audio.kwargs["model"] == "whisper-1"
+    assert transcriber.transcribe(b"audio bytes", "voice.ogg", "audio/ogg") == "olá, tudo bem?"
+    assert model.audio_bytes == b"audio bytes"
+    assert model.options["language"] == "pt"
+    assert model.options["beam_size"] == 5
 
 
 def test_transcriber_rejects_empty_audio() -> None:
-    transcriber = OpenAITranscriber(client=SimpleNamespace())
+    transcriber = FasterWhisperTranscriber(model=FakeWhisperModel())
 
     with pytest.raises(TranscriptionError, match="empty audio"):
         transcriber.transcribe(b"", "voice.ogg", "audio/ogg")
 
 
 def test_transcriber_rejects_blank_result() -> None:
-    audio = FakeAudioTranscriptions(SimpleNamespace(text="  "))
-    transcriber = OpenAITranscriber(client=SimpleNamespace(audio=SimpleNamespace(transcriptions=audio)))
+    model = FakeWhisperModel([SimpleNamespace(text="  ")])
+    transcriber = FasterWhisperTranscriber(model=model)
 
     with pytest.raises(TranscriptionError, match="empty transcription"):
         transcriber.transcribe(b"audio", "voice.ogg", "audio/ogg")
 
 
-def test_transcriber_wraps_provider_errors() -> None:
-    audio = FakeAudioTranscriptions(error=RuntimeError("provider down"))
-    transcriber = OpenAITranscriber(client=SimpleNamespace(audio=SimpleNamespace(transcriptions=audio)))
+def test_transcriber_wraps_local_model_errors() -> None:
+    model = FakeWhisperModel(error=RuntimeError("model failed"))
+    transcriber = FasterWhisperTranscriber(model=model)
 
-    with pytest.raises(TranscriptionError, match="transcription provider failed"):
+    with pytest.raises(TranscriptionError, match="local transcription failed"):
         transcriber.transcribe(b"audio", "voice.ogg", "audio/ogg")

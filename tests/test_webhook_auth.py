@@ -9,7 +9,6 @@ def make_settings() -> Settings:
         evolution_base_url="http://evolution.test",
         evolution_api_key="test-key",
         evolution_instance="personal",
-        openai_api_key="test-openai-key",
         webhook_secret="private-hook-secret",
         _env_file=None,
     )

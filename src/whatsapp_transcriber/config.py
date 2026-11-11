@@ -8,11 +8,13 @@ class Settings(BaseSettings):
     evolution_base_url: str
     evolution_api_key: SecretStr
     evolution_instance: str
-    openai_api_key: SecretStr
     webhook_secret: SecretStr
     database_path: str = "./data/messages.sqlite3"
     max_audio_bytes: int = Field(default=20 * 1024 * 1024, gt=0)
-    openai_model: str = "whisper-1"
+    whisper_model: str = "base"
+    whisper_device: str = "cpu"
+    whisper_compute_type: str = "int8"
+    whisper_cpu_threads: int = Field(default=2, gt=0)
 
     @property
     def normalized_evolution_base_url(self) -> str:

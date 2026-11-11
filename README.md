@@ -7,8 +7,9 @@ MVP pessoal: envie uma mensagem de voz para o número conectado; o serviço resp
 ## Requisitos
 
 - Docker Engine e Docker Compose v2
-- Uma chave da API OpenAI
-- Um número WhatsApp dedicado para vincular à instância
+- Uma conexão de internet na primeira inicialização para baixar o modelo Whisper local.
+- Um número WhatsApp dedicado para vincular à instância.
+- Não é necessária chave OpenAI/GPT: a transcrição roda localmente via `faster-whisper`.
 
 ## Configuração local
 
@@ -19,9 +20,9 @@ cp .env.example .env
 Edite `.env` localmente e defina:
 
 - `EVOLUTION_API_KEY`: uma chave aleatória forte; a mesma chave autentica a API Evolution.
-- `OPENAI_API_KEY`: chave OpenAI.
 - `WEBHOOK_SECRET`: outro segredo forte, diferente da chave da Evolution.
 - `POSTGRES_PASSWORD`: senha alfanumérica forte (para evitar problemas de escaping na URI PostgreSQL).
+- `WHISPER_MODEL`, `WHISPER_DEVICE`, `WHISPER_COMPUTE_TYPE`: modelo e execução locais; padrão `base`, CPU e `int8`, sem custo por minuto/API.
 
 Não envie esses valores por chat e não faça commit do `.env`. A API e o backend ficam bindados a `127.0.0.1`; não exponha as portas 8000/8080 diretamente à internet.
 
@@ -31,6 +32,8 @@ Inicie os serviços:
 docker compose up -d --build
 docker compose ps
 ```
+
+Na primeira inicialização, `faster-whisper` baixa o modelo configurado em `WHISPER_MODEL` (padrão `base`, CPU/int8) para o volume persistente `whisper_models`. Aguarde o serviço `app` ficar `healthy`; o tempo depende da rede e do equipamento. A inferência consome CPU/RAM localmente; não há cobrança por requisição.
 
 A aplicação deve ficar `healthy`; PostgreSQL e Redis devem ficar `healthy`, Evolution API `running`. Verifique:
 
@@ -96,7 +99,7 @@ Referências: [código Evolution API 2.3.7](https://github.com/evolution-foundat
 
 ## Privacidade e limpeza
 
-O backend mantém apenas ID/status/horário da mensagem para idempotência em `app_data`; não guarda o áudio ou a transcrição. Para remover a sessão e todos os dados locais, pare os serviços e remova os volumes **(isso desconecta o WhatsApp e apaga o estado)**:
+O backend mantém apenas ID/status/horário da mensagem para idempotência em `app_data`; não guarda o áudio ou a transcrição. O processamento do áudio é local com `faster-whisper`; o modelo é baixado do Hugging Face na primeira inicialização, mas os bytes do áudio não são enviados a um serviço de transcrição externo. A Evolution API continua recebendo os dados da mensagem no fluxo local. Para remover a sessão e todos os dados locais, pare os serviços e remova os volumes **(isso desconecta o WhatsApp e apaga o estado)**:
 
 ```bash
 docker compose down -v

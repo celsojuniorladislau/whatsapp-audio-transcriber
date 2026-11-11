@@ -3,7 +3,7 @@ from whatsapp_transcriber.config import Settings
 from whatsapp_transcriber.evolution import EvolutionClient
 from whatsapp_transcriber.handler import AudioMessageHandler
 from whatsapp_transcriber.repository import SQLiteRepository
-from whatsapp_transcriber.transcription import OpenAITranscriber
+from whatsapp_transcriber.transcription import FasterWhisperTranscriber
 
 settings = Settings()
 repository = SQLiteRepository(settings.database_path)
@@ -14,9 +14,11 @@ evolution = EvolutionClient(
     instance=settings.evolution_instance,
     max_audio_bytes=settings.max_audio_bytes,
 )
-transcriber = OpenAITranscriber(
-    api_key=settings.openai_api_key.get_secret_value(),
-    model=settings.openai_model,
+transcriber = FasterWhisperTranscriber(
+    model_size=settings.whisper_model,
+    device=settings.whisper_device,
+    compute_type=settings.whisper_compute_type,
+    cpu_threads=settings.whisper_cpu_threads,
 )
 handler = AudioMessageHandler(settings.evolution_instance, repository, evolution, transcriber)
 app = create_app(settings=settings, webhook_handler=handler.process, repository=repository)

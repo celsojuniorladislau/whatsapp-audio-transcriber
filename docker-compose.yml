@@ -6,8 +6,10 @@ services:
     environment:
       EVOLUTION_BASE_URL: http://evolution:8080
       DATABASE_PATH: /data/messages.sqlite3
+      HF_HOME: /models/hf
     volumes:
       - app_data:/data
+      - whisper_models:/models
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -81,3 +83,4 @@ volumes:
   evolution_instances:
   postgres_data:
   redis_data:
+  whisper_models:
