@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      EVOLUTION_BASE_URL: http://evolution:8080
+      EVOLUTION_BASE_URL: http://evolution-go:4000
       DATABASE_PATH: /data/messages.sqlite3
       HF_HOME: /models/hf
     volumes:
@@ -15,7 +15,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      evolution:
+      evolution-go:
         condition: service_started
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=2)"]
@@ -24,31 +24,28 @@ services:
       retries: 3
       start_period: 10s
 
-  evolution:
-    image: ${EVOLUTION_IMAGE:-evoapicloud/evolution-api:v2.3.7}
+  evolution-go:
+    image: ${EVOLUTION_IMAGE:-evoapicloud/evolution-go:latest}
     restart: unless-stopped
     environment:
-      SERVER_URL: http://localhost:8080
+      SERVER_PORT: 4000
+      SERVER_URL: http://localhost:4000
+      CLIENT_NAME: "evolution"
+      GLOBAL_API_KEY: ${EVOLUTION_API_KEY}
       AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
-      DATABASE_PROVIDER: postgresql
-      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=evolution_api
-      DATABASE_SAVE_DATA_INSTANCE: "true"
-      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
-      DATABASE_SAVE_DATA_CONTACTS: "false"
-      DATABASE_SAVE_DATA_CHATS: "false"
-      DATABASE_SAVE_DATA_LABELS: "false"
-      DATABASE_SAVE_DATA_HISTORIC: "false"
-      CACHE_REDIS_ENABLED: "true"
-      CACHE_REDIS_URI: redis://redis:6379/6
-      WEBHOOK_GLOBAL_ENABLED: "false"
+      POSTGRES_AUTH_DB: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      POSTGRES_USERS_DB: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      DATABASE_SAVE_MESSAGES: "false"
+      WADEBUG: "INFO"
+      LOGTYPE: "console"
+      CONNECT_ON_STARTUP: "false"
+      WEBHOOK_FILES: "true"
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:4000:4000"
     volumes:
-      - evolution_instances:/evolution/instances
+      - evolution_instances:/app/dbdata
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
 
   postgres:
@@ -66,21 +63,8 @@ services:
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
 volumes:
   app_data:
   evolution_instances:
   postgres_data:
-  redis_data:
   whisper_models:

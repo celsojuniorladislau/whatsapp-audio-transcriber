@@ -21,3 +21,13 @@ def test_repository_records_error_without_duplicate_rows(tmp_path) -> None:
 
     assert repository.get_status("wamid-2") == "error"
     assert repository.get_error("wamid-2") == "provider unavailable"
+
+
+def test_repository_initializes_with_wal_mode(tmp_path) -> None:
+    repository = SQLiteRepository(str(tmp_path / "messages.sqlite3"))
+    repository.initialize()
+
+    with repository._connect() as connection:
+        journal_mode = connection.execute("PRAGMA journal_mode;").fetchone()[0]
+    assert journal_mode.lower() == "wal"
+    assert repository.is_ready() is True

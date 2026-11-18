@@ -84,3 +84,36 @@ def test_records_failure_and_allows_safe_retry(tmp_path, failure) -> None:
     assert repository.get_status("msg-1") == "error"
     assert handler.process(PAYLOAD) is True
     assert repository.get_status("msg-1") == "done"
+
+
+def test_processes_evolution_go_event_with_embedded_media(tmp_path) -> None:
+    repository = SQLiteRepository(str(tmp_path / "db.sqlite3"))
+    repository.initialize()
+    evolution = FakeEvolution()
+    transcriber = FakeTranscriber()
+    handler = AudioMessageHandler("personal", repository, evolution, transcriber)
+
+    go_payload = {
+        "event": "messages_upsert",
+        "instanceName": "personal",
+        "data": {
+            "key": {
+                "id": "msg-go-999",
+                "remoteJID": "5511977776666@s.whatsapp.net",
+                "from_me": False,
+            },
+            "message": {
+                "audioMessage": {
+                    "mimeType": "audio/ogg; codecs=opus",
+                    "ptt": True,
+                    "base64": "inline-b64-content",
+                }
+            },
+        },
+    }
+
+    assert handler.process(go_payload) is True
+    assert [call[0] for call in evolution.calls] == ["download", "send"]
+    assert evolution.calls[1] == ("send", "5511977776666", "Transcrição: bom dia")
+    assert repository.get_status("msg-go-999") == "done"
+

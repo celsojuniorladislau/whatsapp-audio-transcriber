@@ -1,9 +1,19 @@
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
 from whatsapp_transcriber.app import create_app
 from whatsapp_transcriber.config import Settings
 from whatsapp_transcriber.evolution import EvolutionClient
 from whatsapp_transcriber.handler import AudioMessageHandler
 from whatsapp_transcriber.repository import SQLiteRepository
 from whatsapp_transcriber.transcription import FasterWhisperTranscriber
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 settings = Settings()
 repository = SQLiteRepository(settings.database_path)
@@ -21,4 +31,17 @@ transcriber = FasterWhisperTranscriber(
     cpu_threads=settings.whisper_cpu_threads,
 )
 handler = AudioMessageHandler(settings.evolution_instance, repository, evolution, transcriber)
-app = create_app(settings=settings, webhook_handler=handler.process, repository=repository)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    yield
+    evolution.close()
+
+
+app = create_app(
+    settings=settings,
+    webhook_handler=handler.process,
+    repository=repository,
+    lifespan=lifespan,
+)

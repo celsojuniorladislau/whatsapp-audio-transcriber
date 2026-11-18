@@ -49,3 +49,11 @@ def test_webhook_accepts_correct_secret() -> None:
     assert response.status_code == 200
     assert response.json() == {"status": "accepted"}
     assert received == [{"event": "messages.upsert"}]
+
+    # Also test query parameter support (used by Evolution Go webhook URLs)
+    response_query = client.post(
+        "/webhooks/evolution?secret=private-hook-secret",
+        json={"event": "messages.upsert"},
+    )
+    assert response_query.status_code == 200
+    assert len(received) == 2
